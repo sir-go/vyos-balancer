@@ -1,0 +1,20 @@
+overflow_count = 6
+check_period = "5s"
+
+[vyos]
+   addr = "https://---"
+   key  = "//"
+
+[beeline]
+    alias = "enp3s0.304"
+    lz = 10     # Mbps
+    l0 = 850    # Mbps
+    l1 = 2900   # Mbps
+    nat   = "//"
+
+[ttk]
+    alias = "eno1.100"
+    lz = 10     # Mbps
+    l0 = 3000   # Mbps
+    l1 = 3400   # Mbps
+    nat   = "//"
