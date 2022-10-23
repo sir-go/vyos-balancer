@@ -5,7 +5,8 @@
 ```bash
 go mod download && go build -o vyosctl ./cmd/vyosctl
 ```
-
+### Flags
+`-c` <config file path> - path to `*.toml` config file
 ### Config
 
 ```
