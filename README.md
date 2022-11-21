@@ -1,14 +1,14 @@
-## CLI tool for traffic balancing via [VyOS Router](https://vyos.io/vyos-router)
+# CLI tool for traffic balancing via [VyOS Router](https://vyos.io/vyos-router)
 
-### Build
-
+## Build
 ```bash
 go mod download && go build -o vyosctl ./cmd/vyosctl
 ```
-### Flags
-`-c <config file path>` - path to `*.toml` config file
-### Config
 
+## Flags
+`-c <config file path>` - path to `*.toml` config file
+
+## Config
 ```
 overflow_count = 6        # uplink overflow count
 check_period = "5s"       # how often check uplinks
