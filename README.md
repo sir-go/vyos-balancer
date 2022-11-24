@@ -1,4 +1,5 @@
 # Traffic balancing daemon for [VyOS Router](https://vyos.io/vyos-router)
+[![Go](https://github.com/sir-go/vyos-balancer/actions/workflows/go.yml/badge.svg)](https://github.com/sir-go/vyos-balancer/actions/workflows/go.yml)
 
 We have two uplink providers with different NAT subnets for each.
 
