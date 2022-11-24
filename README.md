@@ -1,4 +1,15 @@
-# CLI tool for traffic balancing via [VyOS Router](https://vyos.io/vyos-router)
+# Traffic balancing daemon for [VyOS Router](https://vyos.io/vyos-router)
+
+We have two uplink providers with different NAT subnets for each.
+
+The daemon regularly checks the usage of each uplink interface and moves firewall NAT rules
+from the more loaded to the less.
+
+## Test
+```bash
+go test -v ./cmd/vyosctl
+gosec -exclude=G402 ./...
+```
 
 ## Build
 ```bash

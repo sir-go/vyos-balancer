@@ -13,34 +13,46 @@ import (
 )
 
 var (
-	NatDynRuleRe  = regexp.MustCompile(`(?ms)^(\d+).+to\s+(\d{0,3}\.\d{0,3}\.\d{0,3}\.\d{0,3}/\d+).*DYNAMIC$`)
+	// NatDynRuleRe  - regexp for matching dynamic NAT rules
+	NatDynRuleRe = regexp.MustCompile(`(?ms)^(\d+).+to\s+(\d{0,3}\.\d{0,3}\.\d{0,3}\.\d{0,3}/\d+).*DYNAMIC$`)
+
+	// NatRuleStatRe  - regexp for matching the rule state
 	NatRuleStatRe = regexp.MustCompile(`(?m)^(\d+)\s+\d+\w?\s+(\d+)(\w)?.*$`)
 )
 
+// VyosResp stores VyOS API response
 type VyosResp struct {
 	Success bool   `json:"success"`
 	Data    string `json:"data"`
 	Error   string `json:"error"`
 }
 
+// VyosAPI client
 type VyosAPI struct {
 	Addr string
 	Key  string
 }
 
-func (vapi *VyosAPI) GetNatRules() (rules map[string][]int) {
+// GetNatRules fetches all NAT rules via VyOS API
+func (api *VyosAPI) GetNatRules() (rules map[string][]int, err error) {
 	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
 
-	res, err := client.PostForm(vapi.Addr+"/show", url.Values{
-		"key":  []string{vapi.Key},
+	res, err := client.PostForm(api.Addr+"/show", url.Values{
+		"key":  []string{api.Key},
 		"data": []string{`{"cmd": "nat source rules"}`},
 	})
-	eh(err)
+	if err != nil {
+		return nil, err
+	}
 
 	resp := new(VyosResp)
-	eh(json.NewDecoder(res.Body).Decode(&resp))
+	err = json.NewDecoder(res.Body).Decode(&resp)
+	if err != nil {
+		return nil, err
+	}
+
 	if !resp.Success {
-		eh(errors.New("vyos resp isn't success"), resp.Error)
+		return nil, errors.New("vyos resp isn't success, " + resp.Error)
 	}
 
 	rules = make(map[string][]int)
@@ -52,7 +64,9 @@ func (vapi *VyosAPI) GetNatRules() (rules map[string][]int) {
 			continue
 		}
 		ruleNum, err := strconv.Atoi(match[1])
-		eh(err)
+		if err != nil {
+			return nil, err
+		}
 
 		if _, ok := rules[match[2]]; !ok {
 			rules[match[2]] = []int{ruleNum}
@@ -63,8 +77,9 @@ func (vapi *VyosAPI) GetNatRules() (rules map[string][]int) {
 	return
 }
 
-func foundInArrInt(s *[]int, v int) bool {
-	for _, i := range *s {
+// foundInArrInt show is an Int value in the array
+func foundInArrInt(s []int, v int) bool {
+	for _, i := range s {
 		if i == v {
 			return true
 		}
@@ -72,9 +87,12 @@ func foundInArrInt(s *[]int, v int) bool {
 	return false
 }
 
-func parseKMGTuint(digits string, multiplier string) uint64 {
+// parseKMGTUint converts a string to uint64 considering a multiplier mark
+func parseKMGTUint(digits string, multiplier string) (uint64, error) {
 	d, err := strconv.ParseUint(digits, 10, 64)
-	eh(err)
+	if err != nil {
+		return 0, err
+	}
 	switch strings.ToLower(multiplier) {
 	case "k":
 		d <<= 10
@@ -85,22 +103,27 @@ func parseKMGTuint(digits string, multiplier string) uint64 {
 	case "t":
 		d <<= 40
 	}
-	return d
+	return d, nil
 }
 
-func (vapi *VyosAPI) GetNatRulesTop(rules []int) (maxBytesRuleNum int) {
+// GetNatRulesTop returns an ID of given
+func (api *VyosAPI) GetNatRulesTop(rules []int) (maxBytesRuleNum int, err error) {
 	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
 
-	res, err := client.PostForm(vapi.Addr+"/show", url.Values{
-		"key":  []string{vapi.Key},
+	res, err := client.PostForm(api.Addr+"/show", url.Values{
+		"key":  []string{api.Key},
 		"data": []string{`{"cmd": "nat source statistics"}`},
 	})
-	eh(err)
+	if err != nil {
+		return 0, err
+	}
 
 	resp := new(VyosResp)
-	eh(json.NewDecoder(res.Body).Decode(&resp))
+	if err = json.NewDecoder(res.Body).Decode(&resp); err != nil {
+		return 0, err
+	}
 	if !resp.Success {
-		eh(errors.New("vyos resp isn't success"), resp.Error)
+		return 0, errors.New("vyos resp isn't success, " + resp.Error)
 	}
 
 	var maxBytes uint64 = 0
@@ -112,23 +135,29 @@ func (vapi *VyosAPI) GetNatRulesTop(rules []int) (maxBytesRuleNum int) {
 		}
 
 		ruleNum, err := strconv.Atoi(match[1])
-		eh(err)
+		if err != nil {
+			return 0, err
+		}
 
-		if !foundInArrInt(&rules, ruleNum) {
+		if !foundInArrInt(rules, ruleNum) {
 			continue
 		}
 
-		bytes := parseKMGTuint(match[2], match[3])
+		bytes, err := parseKMGTUint(match[2], match[3])
+		if err != nil {
+			return 0, err
+		}
 
 		if bytes > maxBytes || maxBytes == 0 {
 			maxBytes = bytes
 			maxBytesRuleNum = ruleNum
 		}
 	}
-	return
+	return maxBytesRuleNum, nil
 }
 
-func (vapi *VyosAPI) SetRuleTarget(ruleNum int, target string) {
+// SetRuleTarget changes a target address for certain NAT rule
+func (api *VyosAPI) SetRuleTarget(ruleNum int, target string) error {
 	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
 
 	data := fmt.Sprintf(
@@ -137,12 +166,17 @@ func (vapi *VyosAPI) SetRuleTarget(ruleNum int, target string) {
 
 	LOG.Println(data)
 
-	res, err := client.PostForm(vapi.Addr+"/configure", url.Values{"key": []string{vapi.Key}, "data": []string{data}})
-	eh(err)
+	res, err := client.PostForm(api.Addr+"/configure", url.Values{"key": []string{api.Key}, "data": []string{data}})
+	if err != nil {
+		return err
+	}
 
 	resp := new(VyosResp)
-	eh(json.NewDecoder(res.Body).Decode(&resp))
-	if !resp.Success {
-		eh(errors.New("vyos resp isn't success"), resp.Error)
+	if err = json.NewDecoder(res.Body).Decode(&resp); err != nil {
+		return err
 	}
+	if !resp.Success {
+		return errors.New("vyos resp isn't success, " + resp.Error)
+	}
+	return nil
 }

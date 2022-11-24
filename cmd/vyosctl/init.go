@@ -26,9 +26,7 @@ func initInterrupt() {
 }
 
 func init() {
-	//runtime.GOMAXPROCS(runtime.NumCPU())
 	runtime.GOMAXPROCS(1)
-	CFG = ConfigInit()
 	LOG = initLogging()
 	initInterrupt()
 }

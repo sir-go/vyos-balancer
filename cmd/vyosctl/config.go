@@ -1,8 +1,6 @@
 package main
 
 import (
-	"flag"
-	"os"
 	"strconv"
 	"time"
 
@@ -41,28 +39,10 @@ func (t *Threshold) UnmarshalText(text []byte) error {
 	return err
 }
 
-func ConfigInit() *Config {
-	fCfgPath := flag.String("c", "config.toml", "path to conf file")
-	flag.Parse()
-
-	conf := new(Config)
-	file, err := os.Open(*fCfgPath)
-	if err != nil {
+func LoadConfig(fileName string) (conf *Config) {
+	if _, err := toml.DecodeFile(fileName, &conf); err != nil {
 		panic(err)
 	}
-
-	defer func() {
-		if file == nil {
-			return
-		}
-		if err = file.Close(); err != nil {
-			panic(err)
-		}
-	}()
-
-	if _, err = toml.DecodeFile(*fCfgPath, &conf); err != nil {
-		panic(err)
-	}
-	conf.Path = *fCfgPath
-	return conf
+	conf.Path = fileName
+	return
 }
